@@ -180,6 +180,9 @@ function frame(dt) {
     camera.fov = 62 + camBlend * 12; camera.updateProjectionMatrix();
     camera.lookAt(_look);
   }
+  if (RECORD && window.__cam) { // manual camera for stills: { eye:[x,y,z], look:[x,y,z], fov }
+    const c = window.__cam; camera.position.set(...c.eye); camera.fov = c.fov; camera.updateProjectionMatrix(); camera.lookAt(...c.look);
+  }
   if (status && mode === 'xr') status.textContent = xrHands.kind;
   renderer.render(scene, camera);
 }

@@ -2,19 +2,22 @@
 import { KIT_W, KIT_H, mulberry32 } from '../core/world.js';
 import { LEVELS } from '../core/levels.js';
 
-const S = 4; // px per cell
+const S = 4; // logical px per cell
+// supersampling for the paper screen (?hires renders it 3x sharper, used for stills/thumbnails)
+const K = (typeof location !== 'undefined' && new URLSearchParams(location.search).has('hires')) ? 3 : 1;
 const INK = 'rgba(18,12,26,';
 
 export class Painter {
   constructor(cfg) {
     this.cfg = cfg; this.W = cfg.W; this.H = cfg.H;
     this.canvas = document.createElement('canvas');
-    this.canvas.width = this.W * S; this.canvas.height = this.H * S;
+    this.LW = this.W * S; this.LH = this.H * S;
+    this.canvas.width = this.LW * K; this.canvas.height = this.LH * K;
     this.ctx = this.canvas.getContext('2d');
     this.shadowC = document.createElement('canvas'); this.shadowC.width = this.W; this.shadowC.height = this.H;
     this.sctx = this.shadowC.getContext('2d');
     this.shadowImg = this.sctx.createImageData(this.W, this.H);
-    this.vecC = document.createElement('canvas'); this.vecC.width = this.W * S; this.vecC.height = this.H * S;
+    this.vecC = document.createElement('canvas'); this.vecC.width = this.W * S * K; this.vecC.height = this.H * S * K;
     this.vctx = this.vecC.getContext('2d');
     this.paper = this._makePaper();
     this.terrainCache = new Map();
@@ -30,8 +33,9 @@ export class Painter {
   Y(y) { return (this.H - y) * S; }
 
   _makePaper() {
-    const c = document.createElement('canvas'); c.width = this.W * S; c.height = this.H * S;
-    const g = c.getContext('2d'), w = c.width, h = c.height, r = mulberry32(42);
+    const c = document.createElement('canvas'); c.width = this.W * S * K; c.height = this.H * S * K;
+    const g = c.getContext('2d'), w = this.LW, h = this.LH, r = mulberry32(42);
+    g.setTransform(K, 0, 0, K, 0, 0);
     g.fillStyle = '#f2dfb8'; g.fillRect(0, 0, w, h);
     // warm lantern hotspot (light comes from below-center)
     const rad = g.createRadialGradient(w / 2, h * 0.82, 20, w / 2, h * 0.7, w * 0.75);
@@ -53,8 +57,9 @@ export class Painter {
 
   _terrain(level) {
     if (this.terrainCache.has(level.id)) return this.terrainCache.get(level.id);
-    const c = document.createElement('canvas'); c.width = this.W * S; c.height = this.H * S;
-    const g = c.getContext('2d'), r = mulberry32(level.id.length * 97);
+    const c = document.createElement('canvas'); c.width = this.W * S * K; c.height = this.H * S * K;
+    const g = c.getContext('2d'); g.setTransform(K, 0, 0, K, 0, 0);
+    const r = mulberry32(level.id.length * 97);
     const d = level.decor || {};
     // background papercut layers
     if (d.moon) {
@@ -123,8 +128,9 @@ export class Painter {
 
   paint(game, dt, caster) {
     this.time += dt;
-    const g = this.ctx, w = this.canvas.width, h = this.canvas.height;
-    g.globalAlpha = 1; g.drawImage(this.paper, 0, 0);
+    const g = this.ctx, w = this.LW, h = this.LH;
+    g.setTransform(K, 0, 0, K, 0, 0);
+    g.globalAlpha = 1; g.drawImage(this.paper, 0, 0, w, h);
 
     if (game.mode === 'level' || game.mode === 'complete') this._paintLevel(game, dt);
     if (game.mode === 'harp') this._paintHarp(game);
@@ -146,7 +152,7 @@ export class Painter {
   // Smooth shadow drawn from the same projected bones that fill the physics grid.
   _paintVectorShadow(prims) {
     const v = this.vctx, H = this.H;
-    v.clearRect(0, 0, this.vecC.width, this.vecC.height);
+    v.setTransform(1, 0, 0, 1, 0, 0); v.clearRect(0, 0, this.vecC.width, this.vecC.height); v.setTransform(K, 0, 0, K, 0, 0);
     v.fillStyle = 'rgb(22,14,30)';
     for (let i = 0; i < prims.length;) {
       v.beginPath();
@@ -170,11 +176,11 @@ export class Painter {
     const g = this.ctx;
     g.save();
     if (this.hq) {
-      g.globalAlpha = 0.45; g.filter = 'blur(7px)'; g.drawImage(this.vecC, 0, 0);
-      g.globalAlpha = 0.93; g.filter = 'blur(1.2px)'; g.drawImage(this.vecC, 0, 0);
+      g.globalAlpha = 0.45; g.filter = `blur(${7 * K}px)`; g.drawImage(this.vecC, 0, 0, this.LW, this.LH);
+      g.globalAlpha = 0.93; g.filter = `blur(${1.2 * K}px)`; g.drawImage(this.vecC, 0, 0, this.LW, this.LH);
     } else {
-      g.globalAlpha = 0.3; g.drawImage(this.vecC, -3, -2, this.vecC.width + 6, this.vecC.height + 4);
-      g.globalAlpha = 0.93; g.drawImage(this.vecC, 0, 0);
+      g.globalAlpha = 0.3; g.drawImage(this.vecC, -3, -2, this.LW + 6, this.LH + 4);
+      g.globalAlpha = 0.93; g.drawImage(this.vecC, 0, 0, this.LW, this.LH);
     }
     g.restore();
   }
@@ -202,7 +208,7 @@ export class Painter {
 
   _paintLevel(game) {
     const g = this.ctx, lv = game.world.level;
-    g.drawImage(this._terrain(lv), 0, 0);
+    g.drawImage(this._terrain(lv), 0, 0, this.LW, this.LH);
     // door: a glowing paper-lantern doorway home
     const d = lv.door, x = this.X(d.x), y = this.Y(d.y), pulse = 0.75 + 0.25 * Math.sin(this.time * 3);
     const glow = g.createRadialGradient(x, y - 26, 4, x, y - 26, 70);
@@ -288,7 +294,7 @@ export class Painter {
   }
 
   _paintMenu(game) {
-    const g = this.ctx, w = this.canvas.width;
+    const g = this.ctx, w = this.LW;
     g.textAlign = 'center';
     g.fillStyle = 'rgba(60,20,16,0.92)';
     g.font = 'bold 64px Georgia, serif'; g.fillText('S H A D E', w / 2, 74);
@@ -298,7 +304,7 @@ export class Painter {
   }
 
   _paintComplete(game) {
-    const g = this.ctx, w = this.canvas.width, s = game.world.stars();
+    const g = this.ctx, w = this.LW, s = game.world.stars();
     g.textAlign = 'center';
     g.fillStyle = 'rgba(60,20,16,0.92)'; g.font = 'bold 40px Georgia, serif';
     g.fillText('Kit made it home', w / 2, 84);
@@ -343,7 +349,7 @@ export class Painter {
   _paintHarp(game) {
     const g = this.ctx;
     g.textAlign = 'center'; g.fillStyle = 'rgba(60,20,16,0.85)'; g.font = 'italic 20px Georgia, serif';
-    g.fillText('Shadow Harp: let your shadow brush the strings', this.canvas.width / 2, 36);
+    g.fillText('Shadow Harp: let your shadow brush the strings', this.LW / 2, 36);
     g.textAlign = 'left';
     for (const s of game.harp.strings) {
       const x = this.X(s.x + 0.5), top = this.Y(90), bot = this.Y(10);
@@ -373,7 +379,7 @@ export class Painter {
     b.t += dt;
     const a = b.t < 0.5 ? b.t / 0.5 : b.t > 6 ? Math.max(0, 1 - (b.t - 6) / 0.8) : 1;
     if (a <= 0) { this.banner = null; return; }
-    const g = this.ctx, w = this.canvas.width;
+    const g = this.ctx, w = this.LW;
     g.globalAlpha = a; g.textAlign = 'center';
     g.fillStyle = 'rgba(60,20,16,0.92)'; g.font = 'bold 28px Georgia, serif'; g.fillText(b.text, w / 2, 40);
     g.font = 'italic 17px Georgia, serif'; g.fillStyle = 'rgba(70,35,24,0.9)'; g.fillText(b.sub, w / 2, 66);
