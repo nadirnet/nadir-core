@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SHADE: Hand-Shadow Theater</title>
+<meta name="description" content="A hands-first shadow-puppet puzzle theater for Meta Quest. Your hands cast the level." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' fill='%23f2dfb8'/><path d='M18 46c4-14 10-22 14-22s6 6 8 4 4-10 8-8-2 16-6 22z' fill='%23161020'/></svg>" />
+<style>
+  :root { --paper:#f2dfb8; --ink:#2a1210; --red:#8b2c2c; --gold:#e9a21c; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: #0d0709; color: var(--paper); font-family: Georgia, 'Times New Roman', serif; overflow: hidden; }
+  #app { position: fixed; inset: 0; }
+  #overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; background: radial-gradient(ellipse at 50% 70%, rgba(60,24,10,.93), rgba(10,5,8,.97) 70%); overflow-y: auto; transition: opacity .4s; }
+  body.in-xr #overlay, body.desktop-play #overlay { opacity: 0; pointer-events: none; }
+  .card { max-width: 560px; width: 100%; text-align: center; }
+  h1 { font-size: clamp(44px, 10vw, 84px); letter-spacing: .35em; margin: 0 0 4px; padding-left: .35em; color: var(--paper); text-shadow: 0 0 30px rgba(255,170,80,.45); }
+  .tag { font-style: italic; font-size: 19px; opacity: .9; margin: 0 0 26px; }
+  button { display: block; width: 100%; margin: 10px 0; padding: 16px 18px; font: 600 19px Georgia, serif; border-radius: 12px; border: 2px solid var(--gold); cursor: pointer; background: transparent; color: var(--paper); }
+  button.primary { background: var(--gold); color: var(--ink); border-color: var(--gold); }
+  button:hover { filter: brightness(1.1); }
+  .how { text-align: left; font-size: 15px; line-height: 1.5; opacity: .85; margin-top: 18px; border-top: 1px solid rgba(242,223,184,.2); padding-top: 14px; }
+  .how b { color: #ffd38a; }
+  #no-xr { font-size: 14px; opacity: .75; }
+  #back { position: fixed; top: 12px; left: 12px; width: auto; padding: 8px 14px; font-size: 14px; display: none; background: rgba(0,0,0,.4); }
+  body.desktop-play #back { display: block; }
+  #keys { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); font-size: 13px; opacity: .7; display: none; text-align: center; padding: 0 16px; }
+  body.desktop-play #keys { display: block; }
+  #status { position: fixed; top: 6px; right: 10px; font-size: 11px; opacity: .3; }
+  #caption { position: fixed; left: 0; right: 0; bottom: 7%; text-align: center; font-style: italic; font-size: 30px; text-shadow: 0 2px 12px #000, 0 0 3px #000; opacity: 0; transition: opacity .6s; pointer-events: none; }
+  #titlecard { position: fixed; inset: 0; display: none; place-items: center; background: #0d0709; text-align: center; }
+  #titlecard.show { display: grid; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="overlay">
+  <div class="card">
+    <h1>SHADE</h1>
+    <p class="tag">A hand-shadow puppet theater. Your hands cast the level.</p>
+    <button id="enter-ar" class="primary" hidden>Enter Mixed Reality</button>
+    <button id="enter-vr" hidden>Enter VR Theater</button>
+    <p id="no-xr" hidden>No headset detected. Open this page in the Meta Quest Browser for the hands-only experience, or try it with a mouse:</p>
+    <button id="play-desktop">Play in browser (mouse)</button>
+    <button id="watch-demo">Watch the puppeteer play</button>
+    <div class="how">
+      <b>Sit comfortably.</b> A lantern rests in your lap and a paper screen floats ahead.<br>
+      <b>Raise your hands into the light.</b> Their shadows are solid in Kit's world: make bridges, elevators, walls and umbrellas.<br>
+      <b>Closer to the lantern = bigger shadow.</b> Hold a shadow over a card to choose it. Tap the wooden tokens on the tray to restart, return to the menu, slow the game down, or recenter.<br>
+      No controllers needed. Every interaction fits within arm's reach.
+    </div>
+  </div>
+</div>
+<button id="back">‹ Back</button>
+<div id="keys">Mouse moves your hand's shadow · Wheel: nearer/farther from lantern · 1–6: hand shapes · W: rotate 90° · Q/E: tilt · R: restart · M: menu · S: slow mode</div>
+<div id="status"></div>
+<div id="caption"></div>
+<div id="titlecard"><div><h1>SHADE</h1><p class="tag" id="titlesub">a hand-shadow puppet theater for Meta Quest</p></div></div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "name": "shade-vr",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "SHADE - a hands-first shadow-puppet puzzle theater for Meta Quest (WebXR)",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "test": "node tests/sim.test.mjs"
+  },
+  "dependencies": {
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "vite": "5.4.11"
+  }
+}
