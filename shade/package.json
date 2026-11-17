@@ -11,6 +11,7 @@
     "test": "node tests/sim.test.mjs"
   },
   "dependencies": {
+    "iwer": "2.8.0",
     "three": "0.170.0"
   },
   "devDependencies": {

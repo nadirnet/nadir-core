@@ -75,9 +75,10 @@ for e in meta['events']:
     elif ty == 'firstShadow': chord([261.63, 392, 523.25], t, 0.08, 0.15)
     elif ty == 'level': chord([196, 293.66, 392], t, 0.1, 0.18)
 
-# title + end-card swells
-chord([196, 293.66, 392, 587.33], 0.3, 0.1, 0.25)
-chord([261.63, 392, 523.25, 659.25, 783.99], meta['frames'] / meta['fps'] - 5.5, 0.12, 0.2)
+# title + end-card swells (skip with --segment for clips spliced into a trailer)
+if '--segment' not in sys.argv:
+  chord([196, 293.66, 392, 587.33], 0.3, 0.1, 0.25)
+  chord([261.63, 392, 523.25, 659.25, 783.99], meta['frames'] / meta['fps'] - 5.5, 0.12, 0.2)
 
 # feedback delay "reverb"
 d = int(0.27 * SR)

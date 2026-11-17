@@ -8,6 +8,7 @@ const { chromium } = createRequire(import.meta.url)('playwright');
 const url = process.argv[2] || 'http://localhost:4173/?record=1';
 const out = process.argv[3] || 'record_out';
 const FPS = 30, INTRO = 3.5, OUTRO = 6;
+const EMU = url.includes('emulate');
 fs.mkdirSync(`${out}/frames`, { recursive: true });
 
 const CAPTIONS = {
@@ -24,7 +25,13 @@ const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=sw
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 page.on('pageerror', e => console.error('PAGEERROR', e.message));
 await page.goto(url);
-await page.waitForFunction(() => window.__shade, null, { timeout: 30000 });
+await page.waitForFunction(EMU ? () => window.__shade && window.__shade.xr === 'hands' : () => window.__shade, null, { timeout: 60000 });
+const stepOne = async () => {
+  if (!EMU) return page.evaluate(() => window.__shade.step(1, 1 / 30));
+  const f0 = await page.evaluate(() => window.__shade.frames);
+  await page.evaluate(() => window.__shade.step(1));
+  await page.waitForFunction(f => window.__shade.frames > f, f0, { timeout: 60000, polling: 10 });
+};
 await page.evaluate(() => { document.getElementById('overlay').style.display = 'none'; document.getElementById('status').style.display = 'none'; });
 
 let f = 0;
@@ -32,7 +39,7 @@ const shot = async () => { await page.screenshot({ path: `${out}/frames/f${Strin
 const setCaption = (text, op) => page.evaluate(([t, o]) => { const c = document.getElementById('caption'); c.textContent = t; c.style.transition = 'none'; c.style.opacity = o; }, [text, op]);
 
 // intro title card (fade from black)
-await page.evaluate(() => document.getElementById('titlecard').classList.add('show'));
+await page.evaluate(emu => { document.getElementById('titlecard').classList.add('show'); if (emu) document.getElementById('titlesub').innerHTML = 'a hand-shadow puppet theater for Meta Quest<br><small style="opacity:.7">captured in IWER, Meta\'s WebXR emulator: emulated Quest 3 with hand tracking</small>'; }, EMU);
 for (let i = 0; i < INTRO * FPS; i++) {
   const a = Math.min(1, i / 20, (INTRO * FPS - i) / 15);
   await page.evaluate(a => { document.getElementById('titlecard').style.opacity = 1; document.querySelector('#titlecard > div').style.opacity = a; }, a);
@@ -44,7 +51,7 @@ let key = null, capT = 0, capText = '', seenMenu = false;
 const startF = f;
 const MAX = 200 * FPS;
 while (f - startF < MAX) {
-  await page.evaluate(() => window.__shade.step(1, 1 / 30));
+  await stepOne();
   const st = await page.evaluate(() => ({ mode: window.__shade.mode, level: window.__shade.level, done: window.__shade.done }));
   let k = st.mode === 'level' ? `level-${st.level}` : st.mode === 'harp' ? 'harp' : st.mode === 'menu' && !seenMenu ? 'menu-first' : null;
   if (st.mode === 'menu') seenMenu = true;
@@ -58,7 +65,7 @@ while (f - startF < MAX) {
 }
 await setCaption('', 0);
 // hold 1s of gameplay tail, then end card
-for (let i = 0; i < FPS; i++) { await page.evaluate(() => window.__shade.step(1, 1 / 30)); await shot(); }
+for (let i = 0; i < FPS; i++) { await stepOne(); await shot(); }
 await page.evaluate(() => {
   const tc = document.getElementById('titlecard'); tc.classList.add('show');
   document.getElementById('titlesub').innerHTML = 'Hands-only &middot; seated &middot; mixed reality<br>WebXR for Meta Quest &mdash; play it in Quest Browser';

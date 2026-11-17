@@ -11,6 +11,7 @@ import { Audio } from './audio.js';
 
 const params = new URLSearchParams(location.search);
 const RECORD = params.has('record');
+const EMU = params.has('emulate'); // run inside Meta's IWER emulator (emulated Quest 3 + hands)
 let demo = params.has('demo') || RECORD;
 
 // ---------- persistence (best-effort) ----------
@@ -88,7 +89,7 @@ async function startXR(kind) {
   scene.background = null;
   await renderer.xr.setSession(session);
   mode = 'xr'; needsPlacement = true; placeFrames = 0;
-  demo = false; director = null; pup.releaseAll();
+  if (!EMU) { demo = false; director = null; pup.releaseAll(); }
   document.body.classList.add('in-xr');
   session.addEventListener('visibilitychange', () => {
     paused = session.visibilityState !== 'visible';
@@ -115,7 +116,6 @@ async function setupOverlay() {
   document.getElementById('watch-demo').onclick = () => { audio.start(); demo = true; game.toMenu(); director = new Director(game, pup); pup.releaseAll(); document.body.classList.add('desktop-play'); };
   document.getElementById('back').onclick = () => document.body.classList.remove('desktop-play');
 }
-if (!RECORD) setupOverlay();
 
 // desktop clicks on the tray tokens + shortcuts
 const raycaster = new THREE.Raycaster();
@@ -144,7 +144,11 @@ function frame(dt) {
   if (mode === 'xr' && needsPlacement && ++placeFrames > 2) { placeTheater(); needsPlacement = false; }
 
   let hands;
-  if (mode === 'xr') hands = xrHands.read(theater.root);
+  if (mode === 'xr') {
+    if (EMU && director) { director.step(dt); pup.update(dt); }
+    hands = xrHands.read(theater.root);
+    if (EMU && emuDriver && director) emuDriver.drive(pup.out, pup.hands, xrHands, theater.root);
+  }
   else if (demo && director) { director.step(dt); hands = pup.update(dt); if (director.done && !RECORD) { game.toMenu(); director = new Director(game, pup); } }
   else hands = [mouse.update(dt, camera, theater.root), null];
 
@@ -183,17 +187,36 @@ function frame(dt) {
 const eventLog = [];
 let camBlend = 1; const _look = new THREE.Vector3();
 const WIDE_EYE = new THREE.Vector3(0, 0.13, 1.12), WIDE_LOOK = new THREE.Vector3(0, -0.13, 0);
-if (RECORD) {
-  window.__shade = {
-    step(n = 1, dt = 1 / 30) { for (let i = 0; i < n; i++) frame(dt); },
-    get done() { return director?.done; },
-    get events() { return eventLog; },
-    get mode() { return game.mode; },
-    get level() { return game.levelIndex; },
-    get t() { return tAll; },
-  };
-  director.harpTime = 13;
-  frame(1 / 30);
-} else {
-  renderer.setAnimationLoop(() => frame(Math.min(clock.getDelta(), 0.05)));
+let emuDriver = null, emuBudget = 0, frameCount = 0;
+async function boot() {
+  if (EMU) {
+    const { installEmulator, EmulatorDriver } = await import('./input/emulator.js');
+    const device = await installEmulator();
+    emuDriver = new EmulatorDriver(device);
+    window.__emu = device;
+    director = new Director(game, pup);
+  }
+  if (director) director.harpTime = 13;
+  if (!RECORD) setupOverlay();
+  if (RECORD) {
+    window.__shade = {
+      step(n = 1, dt = 1 / 30) { if (EMU) emuBudget += n; else for (let i = 0; i < n; i++) frame(dt); },
+      get frames() { return frameCount; },
+      get done() { return director?.done; },
+      get events() { return eventLog; },
+      get mode() { return game.mode; },
+      get level() { return game.levelIndex; },
+      get t() { return tAll; },
+      get xr() { return mode === 'xr' ? xrHands.kind : 'none'; },
+      snap(q = 0.9) { return renderer.domElement.toDataURL('image/jpeg', q); },
+    };
+  }
+  if (RECORD && !EMU) { frame(1 / 30); return; }
+  renderer.setAnimationLoop(() => {
+    let dt = Math.min(clock.getDelta(), 0.05);
+    if (RECORD) { if (emuBudget > 0) { emuBudget--; dt = 1 / 30; } else dt = 0; }
+    frame(dt); if (dt > 0) frameCount++;
+  });
+  if (EMU && RECORD) await startXR('immersive-vr');
 }
+boot();
